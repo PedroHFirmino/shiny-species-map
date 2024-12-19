@@ -17,7 +17,7 @@ bio_occurrence <- bio_occurrence %>%
          locality, modified, taxonRank, family, kingdom  )
 
 bio_occurrence <- bio_occurrence %>%
-  mutate(kingdom = if_else(is.na(kingdom), 'Unknow', kingdom),
+  mutate(kingdom = if_else(is.na(kingdom), 'Unknown', kingdom),
          vernacularName = if_else(is.na(vernacularName), 'Unavailable', vernacularName),
          locality = str_remove(locality, ".*-"),
          family =str_replace_all(family, '-',''),
@@ -72,7 +72,27 @@ dashboardBody(
   )
 )
 
+server <- function(input, output, session) {
 
+# Timeline
+
+output$occurrence_timeline <- renderPlotly({
+  req(input$Scientific_Vernacular_Name)
+  
+  bio_occurrence %>%
+    filter(names == input$Scientific_Vernacular_Name) %>%
+    mutate(modified = dmy(modified),
+           yr = as.factor (year(modified)))%>%
+    group_by(names, yr) %>%
+    summarise(Count = sum(individualCount)) %>%
+    ggplot() +
+    geom_col(aes(yr, Count, fill = yr)) +
+    theme_minimal()
+    
+    
+})
+
+}
 
 
 shinyApp(ui=ui, server = server)
