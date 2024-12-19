@@ -30,12 +30,13 @@ bio_occurrence <- bio_occurrence %>%
          locality, modified, taxonRank, family, kingdom,  )
 
 bio_occurrence <- bio_occurrence %>%
-  mutate(kingdom = if_else(is.na(kingdom), 'Unknown', kingdom),
+    mutate(kingdom = if_else(is.na(kingdom), 'Unknown', kingdom),
          vernacularName = if_else(is.na(vernacularName), 'Unavailable', vernacularName),
          locality = str_remove(locality, ".*-"),
          family =str_replace_all(family, '-',''),
          family = str_to_title(family),
-         names = as.factor(paste(scientificName, "|", vernacularName))
+         names = as.factor(paste(scientificName, "|", vernacularName)),
+         eventDate = as.Date(modified)
          )
 
 #Dropdown
@@ -63,6 +64,7 @@ dashboardBody(
   tabItems(
     tabItem(
       tabName = "bio_occurrence",
+      #Map Specie
       fluidRow(
         column(
           width = 4,
@@ -71,11 +73,17 @@ dashboardBody(
         column(
           width = 8,
           leafletOutput("occurrence_map",height = 400)
+        ),
+        #Graphic Selected Specie by Year
+        fluidRow(
+          box(title = "Occurrence of Selected Specie by Year", 
+              plotlyOutput("occurrence_by_year"), width = 6)
         )
       ),
+      #Map of Total Species
       fluidRow(
         column(
-          width = 12,
+          width = 6,
           h4("Map of Total Species"),
           leafletOutput("total_map", height = 400)
         )
@@ -86,6 +94,12 @@ dashboardBody(
 )
 
 server <- function(input, output, session) {
+  
+  filtered_data <- reactive({
+    req(input$species_selector)
+    bio_occurrence %>%
+      filter(names == input$species_selector)
+  })
 
 # Timeline
 
@@ -94,8 +108,8 @@ output$occurrence_timeline <- renderPlotly({
   
   bio_occurrence %>%
     filter(names == input$Scientific_Vernacular_Name) %>%
-    mutate(modified = dmy(modified),
-           yr = as.factor (year(modified)))%>%
+    bio_occurrence <- bio_occurrence %>%
+    eventDate = as.Date(modified)
     group_by(names, yr) %>%
     summarise(Count = sum(individualCount)) %>%
     ggplot() +
@@ -151,6 +165,31 @@ output$total_map <- renderLeaflet({
                      "<b>Total Species:</b>", total_species)
     )
 })
+
+output$occurrence_by_year <- renderPlotly({
+  data <- filtered_data()
+  
+  # Data/year
+  yearly_data <- data %>%
+    group_by(year = lubridate::year(eventDate)) %>%
+    summarise(total_count = sum(individualCount, na.rm = TRUE)) %>%
+    filter(!is.na(year)) # Remover anos ausentes
+  
+  # Create Graphic
+  p <- ggplot(yearly_data, aes(x = year, y = total_count)) +
+    geom_bar(stat = "identity", fill = "steelblue") +
+    labs(title = paste("Occurrence of", input$species_selector, "by Year"),
+         x = "Year", y = "Total Occurrences") +
+    theme_minimal()
+  
+  ggplotly(p)
+})
+
+
+
+
+
+
 
 
 }
