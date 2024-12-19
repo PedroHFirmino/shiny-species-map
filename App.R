@@ -60,47 +60,65 @@ ui <- dashboardPage(
     )
   ),
 
-dashboardBody(
-  tabItems(
-    tabItem(
-      tabName = "bio_occurrence",
-      #Map Specie
-      fluidRow(
-        column(
-          width = 4,
-          selectInput("species_selector", "Please, select a specie:", choices = sv_names)
-        ),
-        column(
-          width = 8,
-          leafletOutput("occurrence_map",height = 400)
-        ),
-        #Graphic Selected Specie by Year
+  dashboardBody(
+    tabItems(
+      tabItem(
+        tabName = "bio_occurrence",
+        
+        #Search Menu
         fluidRow(
-          box(title = "Occurrence of Selected Specie by Year", 
-              plotlyOutput("occurrence_by_year"), width = 5)
-        )
-      ),
-      fluidRow(
-        box(title = "Yearly Occurrence of Selected Species by Locality", 
-            plotlyOutput("occurrence_by_locality"), width = 5)
-      ),
-      
-      fluidRow(
-        box(title = "Occurrence of Selected Species by Locality", 
-            plotlyOutput("occurrence_by_locality_total"), width = 5)
-      ),
-      #Map of Total Species
-      fluidRow(
-        column(
-          width = 5,
-          h4("Map of Total Species"),
-          leafletOutput("total_map", height = 400)
+          column(
+            width = 12,
+            style = "display: flex; justify-content: center; align-items: center; padding-top: 10px;",  # Reduzir o espaço entre a barra de pesquisa e o mapa
+            selectInput("species_selector", "Please, select a specie:", choices = sv_names)
+          )
+        ),
+        
+        # Map/Selected Specie
+        fluidRow(
+          column(
+            width = 12,
+            leafletOutput("occurrence_map", height = 400)
+          )
+        ),
+        
+        # Graphic Adjustment 
+        fluidRow(
+          column(
+            width = 4,
+            box(
+              title = "Occurrence of Selected Species by Year", 
+              plotlyOutput("occurrence_by_year")
+            )
+          ),
+          column(
+            width = 4,
+            box(
+              title = "Yearly Occurrence of Selected Species by Locality", 
+              plotlyOutput("yearly_occurrence_by_locality")
+            )
+          ),
+          column(
+            width = 4,
+            box(
+              title = "Occurrence of Selected Species by Locality", 
+              plotlyOutput("occurrence_by_locality_total")
+            )
+          )
+        ),
+        
+        # Map Total Species
+        fluidRow(
+          column(
+            width = 5,
+            h4("Map of Total Species"),
+            leafletOutput("total_map", height = 400)
+          )
         )
       )
     )
   )
-  )
-)
+) 
 
 server <- function(input, output, session) {
   
