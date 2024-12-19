@@ -69,7 +69,7 @@ ui <- dashboardPage(
         fluidRow(
           column(
             width = 12,
-            style = "display: flex; justify-content: center; align-items: center; padding-top: 10px;",  # Reduzir o espaço entre a barra de pesquisa e o mapa
+            style = "display: flex; justify-content: center; align-items: center; padding-top: 10px;",  
             selectInput("species_selector", "Please, select a specie:", choices = sv_names)
           )
         ),
@@ -82,37 +82,59 @@ ui <- dashboardPage(
           )
         ),
         
-        # Graphic Adjustment 
+        #Graphics
         fluidRow(
           column(
-            width = 4,
-            box(
-              title = "Occurrence of Selected Species by Year", 
-              plotlyOutput("occurrence_by_year")
-            )
+            width = 4,  
+            style = "padding: 15px; margin: 0;",  
+            plotlyOutput("occurrence_by_year", height = 300)
           ),
           column(
             width = 4,
-            box(
-              title = "Yearly Occurrence of Selected Species by Locality", 
-              plotlyOutput("yearly_occurrence_by_locality")
-            )
+            style = "padding: 15px; margin: 0;",  
+            plotlyOutput("yearly_occurrence_by_locality", height = 300)
           ),
           column(
-            width = 4,
-            box(
-              title = "Occurrence of Selected Species by Locality", 
-              plotlyOutput("occurrence_by_locality_total")
-            )
+            width = 4,  
+            style = "padding: 15px; margin: 0;",  
+            plotlyOutput("occurrence_by_locality_total", height = 300)
           )
         ),
         
         # Map Total Species
         fluidRow(
           column(
-            width = 5,
-            h4("Map of Total Species"),
-            leafletOutput("total_map", height = 400)
+            width = 12,
+            div(
+              style = "cursor: default; text-align: center; font-weight: bold; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; margin-bottom: 10px;",
+              tags$style(
+                HTML("
+          #title-hover {
+            color: #4CAF50; 
+            font-weight: bold;  
+            display: inline-block;
+          }
+          #title-hover:hover {
+            color: #ffffff; 
+            cursor: pointer;
+            transition: color 0.3s ease;
+          }
+        ")
+              ),
+              h4(
+                id = "title-hover",
+                "Map of Total Species"
+              )  
+            ),
+            leafletOutput("total_map", height = 400),
+          )
+        ),
+        #Graphic Total Species
+        fluidRow(
+          column(
+            width = 4,  
+            style = "padding: 15px; margin: 0; ",
+            plotlyOutput("total_occurrence_by_year", height = 400)
           )
         )
       )
@@ -133,14 +155,13 @@ server <- function(input, output, session) {
 output$occurrence_timeline <- renderPlotly({
   req(input$Scientific_Vernacular_Name)
   
-  bio_occurrence %>%
+  bio_occurrence <- bio_occurrence %>%
     filter(names == input$Scientific_Vernacular_Name) %>%
-    bio_occurrence <- bio_occurrence %>%
-    eventDate = as.Date(modified)
-    group_by(names, yr) %>%
-    summarise(Count = sum(individualCount)) %>%
-    ggplot() +
-    geom_col(aes(yr, Count, fill = yr)) +
+    mutate(eventDate = as.Date(modified)) %>%
+    group_by(names, yr = lubridate::year(eventDate)) %>%
+    summarise(Count = sum(individualCount, na.rm = TRUE)) %>%
+    ggplot(aes(x = yr, y = Count, fill = as.factor(yr))) +
+    geom_col() +
     theme_minimal()
     
     
@@ -193,6 +214,7 @@ output$total_map <- renderLeaflet({
     )
 })
 
+#Graphic for Occurrence by Year
 output$occurrence_by_year <- renderPlotly({
   data <- filtered_data()
   
@@ -209,18 +231,28 @@ output$occurrence_by_year <- renderPlotly({
          x = "Year", y = "Total Occurrences") +
     theme_minimal()
   
-  ggplotly(p)
+  # Make it responsive
+  p_plotly <- ggplotly(p) %>%
+    layout(
+      title = list(
+        text = paste("Occurrence of", input$species_selector, "by Year"),
+        font = list(size = 13),
+        automargin = TRUE
+      )
+    )
+  
+  p_plotly
 })
 
-
 # Graphic Year/Locality
-output$occurrence_by_locality <- renderPlotly({
+output$yearly_occurrence_by_locality <- renderPlotly({
   req(filtered_data())
   
+  # Prepare the data
   locality_data <- filtered_data() %>%
     group_by(year = lubridate::year(eventDate), locality) %>%
     summarise(total_count = sum(individualCount, na.rm = TRUE)) %>%
-    filter(!is.na(year), !is.na(locality))  # Don't show dates without occurences
+    filter(!is.na(year), !is.na(locality))  # Remove missing years and locales
   
   # Create Graphic
   p <- ggplot(locality_data, aes(x = year, y = total_count, fill = locality)) +
@@ -230,9 +262,18 @@ output$occurrence_by_locality <- renderPlotly({
     theme_minimal() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
   
-  ggplotly(p)
+  # Make it responsive
+  p_plotly <- ggplotly(p) %>%
+    layout(
+      title = list(
+        text = paste("Yearly Occurrence of", input$species_selector, "by Locality"),
+        font = list(size = 13),
+        automargin = TRUE
+      )
+    )
+  
+  p_plotly
 })
-
 
 # Occurrence by Locality
 output$occurrence_by_locality_total <- renderPlotly({
@@ -241,7 +282,7 @@ output$occurrence_by_locality_total <- renderPlotly({
   locality_data <- filtered_data() %>%
     group_by(locality) %>%
     summarise(total_count = sum(individualCount, na.rm = TRUE)) %>%
-    filter(!is.na(locality))  # Don't show locality without occurences
+    filter(!is.na(locality))  # Don't show locality without occurrences
   
   # Create Graphic
   p <- ggplot(locality_data, aes(x = reorder(locality, total_count), y = total_count)) +
@@ -251,10 +292,45 @@ output$occurrence_by_locality_total <- renderPlotly({
     theme_minimal() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
   
-  ggplotly(p)
+  # Make it responsive
+  p_plotly <- ggplotly(p) %>%
+    layout(
+      title = list(
+        text = paste("Occurrence of", input$species_selector, "by Locality"),
+        font = list(size = 13),
+        automargin = TRUE
+      )
+    )
+  
+  p_plotly
 })
 
-
+# Graphic for Map of Total Species
+output$total_occurrence_by_year <- renderPlotly({
+  yearly_data <- bio_occurrence %>%
+    group_by(year = lubridate::year(eventDate)) %>%
+    summarise(total_count = sum(individualCount, na.rm = TRUE)) %>%
+    filter(!is.na(year))  # Remove missing years
+  
+  # Create Graphic
+  p <- ggplot(yearly_data, aes(x = year, y = total_count)) +
+    geom_bar(stat = "identity", fill = "steelblue") +
+    labs(title = "Total Occurrence of Species by Year",
+         x = "Year", y = "Total Occurrences") +
+    theme_minimal()
+  
+  # Make it responsive
+  p_plotly <- ggplotly(p) %>%
+    layout(
+      title = list(
+        text = "Total Occurrence of Species by Year",
+        font = list(size = 13),
+        automargin = TRUE
+      )
+    )
+  
+  p_plotly
+})
 
 
 
