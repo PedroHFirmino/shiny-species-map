@@ -77,13 +77,17 @@ dashboardBody(
         #Graphic Selected Specie by Year
         fluidRow(
           box(title = "Occurrence of Selected Specie by Year", 
-              plotlyOutput("occurrence_by_year"), width = 6)
+              plotlyOutput("occurrence_by_year"), width = 5)
         )
+      ),
+      fluidRow(
+        box(title = "Yearly Occurrence of Selected Species by Locality", 
+            plotlyOutput("occurrence_by_locality"), width = 5)
       ),
       #Map of Total Species
       fluidRow(
         column(
-          width = 6,
+          width = 5,
           h4("Map of Total Species"),
           leafletOutput("total_map", height = 400)
         )
@@ -181,6 +185,27 @@ output$occurrence_by_year <- renderPlotly({
     labs(title = paste("Occurrence of", input$species_selector, "by Year"),
          x = "Year", y = "Total Occurrences") +
     theme_minimal()
+  
+  ggplotly(p)
+})
+
+
+# Graphic Year/Locality
+output$occurrence_by_locality <- renderPlotly({
+  req(filtered_data())
+  
+  locality_data <- filtered_data() %>%
+    group_by(year = lubridate::year(eventDate), locality) %>%
+    summarise(total_count = sum(individualCount, na.rm = TRUE)) %>%
+    filter(!is.na(year), !is.na(locality))  # Don't show dates without occurences
+  
+  # Create Graphic
+  p <- ggplot(locality_data, aes(x = year, y = total_count, fill = locality)) +
+    geom_bar(stat = "identity", position = "stack") +
+    labs(title = paste("Yearly Occurrence of", input$species_selector, "by Locality"),
+         x = "Year", y = "Total Occurrences") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
   
   ggplotly(p)
 })
