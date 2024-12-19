@@ -1,3 +1,16 @@
+
+#If you don't have the dependencies is necessary to install
+#install.packages(shiny)
+#install.packages(shinydashboard)
+#install.packages(tidyverse)
+#install.packages(lubridate)
+#install.packages(leaflet)
+#install.packages(plotly)
+#install.packages(scales)
+#install.packages(sf)
+#install.packages(janitor)
+
+
 library(shiny)
 library(shinydashboard)
 library(tidyverse)
@@ -14,7 +27,7 @@ bio_occurrence <- read_csv("F:/species-map/data/poland_data.csv") #Important - Y
 
 bio_occurrence <- bio_occurrence %>%
   select(id, scientificName, vernacularName, individualCount, lifeStage, longitudeDecimal, latitudeDecimal,
-         locality, modified, taxonRank, family, kingdom  )
+         locality, modified, taxonRank, family, kingdom,  )
 
 bio_occurrence <- bio_occurrence %>%
   mutate(kingdom = if_else(is.na(kingdom), 'Unknown', kingdom),
@@ -42,7 +55,7 @@ ui <- dashboardPage(
   ),
   dashboardSidebar(
     sidebarMenu(
-      menuItem("Map of Species Occurrence in Poland", tabName = "bio_occurrence")
+      menuItem("Species Occurrence in Poland", tabName = "bio_occurrence")
     )
   ),
 
@@ -53,7 +66,7 @@ dashboardBody(
       fluidRow(
         column(
           width = 4,
-          selectInput("species_selector", "Choose a specie:", choices = sv_names)
+          selectInput("species_selector", "Please, select a specie:", choices = sv_names)
         ),
         column(
           width = 8,
@@ -92,7 +105,57 @@ output$occurrence_timeline <- renderPlotly({
     
 })
 
+
+#Occurrence map by region (Poland)
+output$occurrence_map <- renderLeaflet({
+  selected_species <- input$species_selector
+  filtered_data <- bio_occurrence %>%
+    filter(names == selected_species)
+  
+  leaflet(data = filtered_data) %>%
+    addTiles() %>%
+    addCircleMarkers(
+      ~longitudeDecimal, ~latitudeDecimal,
+      radius = ~log(individualCount + 1) * 2,
+      color = "brown",
+      popup = ~paste("<b>Scientific Name:</b>", scientificName, "<br>",
+                     "<b>Vernacular Name:</b>", vernacularName, "<br>",
+                     "<b>Count:</b>", individualCount, "<br>",
+                     "<b>Year:</b>", modified, "<br>",
+                       "<b>Locality:</b>", locality)
+    )
+})
+
+# Map for all Species
+output$total_map <- renderLeaflet({
+  #Occurrence count by location
+  choropleth_data <- bio_occurrence %>%
+    group_by(locality) %>%
+    summarise(total_species = n()) %>%
+    filter(!is.na(locality))
+  
+  # Coordinates to display on the map
+  choropleth_data <- choropleth_data %>%
+    mutate(
+      longitude = runif(n(), min = 14, max = 24),  # Poland
+      latitude = runif(n(), min = 49, max = 55)
+    )
+  
+  leaflet(data = choropleth_data) %>%
+    addTiles() %>%
+    addCircleMarkers(
+      ~longitude, ~latitude,
+      radius = ~log(total_species + 1) * 2,
+      color = "green",
+      popup = ~paste("<b>Locality:</b>", locality, "<br>",
+                     "<b>Total Species:</b>", total_species)
+    )
+})
+
+
 }
+
+
 
 
 shinyApp(ui=ui, server = server)
