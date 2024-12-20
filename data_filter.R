@@ -5,7 +5,7 @@ library(data.table)
 
 #Important - You must have change the directory
 input_file <- "F:/species-map/data/occurence.csv"
-output_file <- "F:/species-map/data/poland_data.csv"
+output_file <- "data/poland_data.csv"
 
 #Read
 cat("Reading the file...\n")

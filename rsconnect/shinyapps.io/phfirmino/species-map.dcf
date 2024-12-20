@@ -1,0 +1,10 @@
+name: species-map
+title:
+username: phfirmino
+account: phfirmino
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 13626301
+bundleId: 9548579
+url: https://phfirmino.shinyapps.io/species-map/
+version: 1

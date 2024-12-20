@@ -11,7 +11,16 @@
 #install.packages("janitor")
 #install.packages("rnaturalearth")
 #install.packages("devtools")
+#install.packages("rsconnect")
 
+if (!requireNamespace("rnaturalearthhires", quietly = TRUE)) {
+  install.packages("devtools")
+  devtools::install_github("ropensci/rnaturalearthhires")
+}
+
+options(repos = c(CRAN = "https://cran.rstudio.com"))
+
+library(rsconnect)
 library(rnaturalearth)
 library(shiny)
 library(shinydashboard)
@@ -27,7 +36,7 @@ poland_border <- ne_states(country = "Poland", returnclass = "sf")
 
 
 #Read data and select
-bio_occurrence <- read_csv("F:/species-map/data/poland_data.csv") #Important - You must have change the directory.
+bio_occurrence <- read_csv("data/poland_data.csv") #Important - You must have change the directory.
 
 bio_occurrence <- bio_occurrence %>%
   select(id, scientificName, vernacularName, individualCount, lifeStage, longitudeDecimal, latitudeDecimal,
@@ -52,7 +61,7 @@ sv_names <- unique(bio_occurrence$names)
 ui <- dashboardPage(
   skin = "green", 
   dashboardHeader(
-    title = "Biodiversity Dashboard by Pedro",  # Apenas o texto simples
+    title = "Biodiversity Dashboard by Pedro",
     titleWidth = '100%' 
   ),
   
