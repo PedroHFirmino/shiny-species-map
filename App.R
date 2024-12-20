@@ -1,16 +1,18 @@
 
 #If you don't have the dependencies is necessary to install
-#install.packages(shiny)
-#install.packages(shinydashboard)
-#install.packages(tidyverse)
-#install.packages(lubridate)
-#install.packages(leaflet)
-#install.packages(plotly)
-#install.packages(scales)
-#install.packages(sf)
-#install.packages(janitor)
+#install.packages("shiny")
+#install.packages("shinydashboard")
+#install.packages("tidyverse")
+#install.packages("lubridate")
+#install.packages("leaflet")
+#install.packages("plotly")
+#install.packages("scales")
+#install.packages("sf")
+#install.packages("janitor")
+#install.packages("rnaturalearth")
+#install.packages("devtools")
 
-
+library(rnaturalearth)
 library(shiny)
 library(shinydashboard)
 library(tidyverse)
@@ -20,6 +22,8 @@ library(plotly)
 library(scales)
 library(sf)
 library(janitor)
+
+poland_border <- ne_states(country = "Poland", returnclass = "sf")
 
 
 #Read data and select
@@ -48,10 +52,7 @@ sv_names <- unique(bio_occurrence$names)
 ui <- dashboardPage(
   skin = "green", 
   dashboardHeader(
-    title = tags$div(
-      style = "display: flex; justify-content: center; align-items: center; flex-direction: column;",
-      tags$span("Biodiversity Dashboard by Pedro", style = "font-size: 18px;")
-    ),
+    title = "Biodiversity Dashboard by Pedro",  # Apenas o texto simples
     titleWidth = '100%' 
   ),
   
@@ -250,34 +251,75 @@ server <- function(input, output, session) {
                        "<b>Locality:</b>", locality)
       )
   })
-
-# Map for all Species
-output$total_map <- renderLeaflet({
-  #Occurrence count by location
-  choropleth_data <- bio_occurrence %>%
-    group_by(locality) %>%
-    summarise(total_species = n()) %>%
-    filter(!is.na(locality))
   
-  # Coordinates to display on the map
-  choropleth_data <- choropleth_data %>%
-    mutate(
-      longitude = runif(n(), min = 14, max = 24),  # Poland
-      latitude = runif(n(), min = 49, max = 55)
-    )
-  
-  leaflet(data = choropleth_data) %>%
-    addTiles() %>%
-    addCircleMarkers(
-      ~longitude, ~latitude,
-      radius = ~log(total_species + 1) * 2,
-      color = "brown",
-      popup = ~paste("<b>Locality:</b>", locality, "<br>",
-                     "<b>Total Species:</b>", total_species)
-      
-    )
-})
+  #Map Total Species
+  output$total_map <- renderLeaflet({
+    
+    # Poland Territory
+    poland_border <- ne_states(country = "Poland", returnclass = "sf")
+    
+    #data
+    choropleth_data <- bio_occurrence %>%
+      group_by(locality) %>%
+      summarise(total_species = n(), .groups = 'drop') %>%
+      filter(!is.na(locality))
+    
+    # Add Cordinates
+    choropleth_data <- choropleth_data %>%
+      mutate(
+        longitude = runif(n(), min = 14, max = 24),
+        latitude = runif(n(), min = 49, max = 55)
+      )
+    
+    # Convert to sf
+    coordinates_sf <- st_as_sf(choropleth_data, coords = c("longitude", "latitude"), crs = 4326, remove = FALSE)
+    
+    # Filter in Poland Territory
+    coordinates_sf <- st_intersection(coordinates_sf, poland_border)
+    
+    # 
+    if (nrow(coordinates_sf) == 0) {
+      print("There is no data within the boundaries of Poland.")
+    } else {
+      print(head(coordinates_sf))
+    }
+    
 
+    #Group occurrences by region
+    region_data <- coordinates_sf %>%
+      group_by(locality) %>%
+      summarise(total_species = sum(total_species), .groups = 'drop')
+    
+    # Create the color palette based on the total number of species
+    pal <- colorQuantile("YlOrRd", region_data$total_species, n = 5)
+    
+    # Render the map with painted regions
+    leaflet(data = poland_border) %>%
+      addTiles() %>%
+      addPolygons(
+        data = poland_border,
+        fillColor = ~pal(region_data$total_species), 
+        weight = 1,
+        color = "brown",
+        opacity = 0.6,
+        fillOpacity = 0.3,
+        popup = ~paste("<b>Locality:</b>", region_data$locality, "<br><b>Total Species:</b>", region_data$total_species),
+        highlight = highlightOptions(
+          weight = 2,                 
+          color = "black",            
+          fillOpacity = 0.7,          
+          bringToFront = TRUE         
+        )
+      ) %>%
+      setView(lng = 19.5, lat = 51, zoom = 6) %>%
+      addLegend(
+        position = "topright",
+        pal = pal,
+        values = region_data$total_species,
+        title = "Total Species",
+        opacity = 1
+      )
+  })
 #Graphic for Occurrence by Year
 output$occurrence_by_year <- renderPlotly({
   data <- filtered_data()
