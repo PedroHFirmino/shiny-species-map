@@ -46,24 +46,22 @@ sv_names <- unique(bio_occurrence$names)
 #UI - Dashboard
 
 ui <- dashboardPage(
-  skin = "green",
+  skin = "green", 
   dashboardHeader(
     title = tags$div(
       style = "display: flex; justify-content: center; align-items: center; flex-direction: column;",
       tags$span("Biodiversity Dashboard by Pedro", style = "font-size: 18px;")
     ),
-    titleWidth = '100%'
+    titleWidth = '100%' 
   ),
-  dashboardSidebar(
-    sidebarMenu(
-      menuItem("Species Occurrence in Poland", tabName = "bio_occurrence")
-    )
-  ),
-
+  
+  
+  dashboardSidebar(disable = TRUE),
+  
   dashboardBody(
-    tabItems(
-      tabItem(
-        tabName = "bio_occurrence",
+    tabsetPanel(
+      tabPanel(
+        "Overview",
         
         #Search Menu
         fluidRow(
@@ -78,7 +76,41 @@ ui <- dashboardPage(
         fluidRow(
           column(
             width = 12,
+            div(
+              style = "cursor: default; text-align: center; font-weight: bold; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; margin-bottom: 10px;",
+              tags$style(
+                HTML("
+          #title-hover {
+            color: #4CAF50; 
+            font-weight: bold;  
+            display: inline-block;
+          }
+          #title-hover:hover {
+            color: #ffffff; 
+            cursor: pointer;
+            transition: color 0.3s ease;
+          }
+        ")
+              ),
+              h4(
+                id = "title-hover",
+                "Map Species/Region"
+              )  
+            ),
             leafletOutput("occurrence_map", height = 400)
+          )
+        ),
+        #Species Information
+        fluidRow(
+          column(
+            width = 12,
+            box(
+              status = "primary", 
+              solidHeader = TRUE, 
+              width = NULL, 
+              style = "padding: 20px; text-align: center;border: 1px solid #4CAF50;",
+              uiOutput("species_details")
+            )
           )
         ),
         
@@ -132,7 +164,7 @@ ui <- dashboardPage(
         #Graphic Total Species
         fluidRow(
           column(
-            width = 4,  
+            width = 12,  
             style = "padding: 15px; margin: 0; ",
             plotlyOutput("total_occurrence_by_year", height = 400)
           )
@@ -142,6 +174,7 @@ ui <- dashboardPage(
   )
 ) 
 
+#Server
 server <- function(input, output, session) {
   
   filtered_data <- reactive({
@@ -149,44 +182,74 @@ server <- function(input, output, session) {
     bio_occurrence %>%
       filter(names == input$species_selector)
   })
-
-# Timeline
-
-output$occurrence_timeline <- renderPlotly({
-  req(input$Scientific_Vernacular_Name)
   
-  bio_occurrence <- bio_occurrence %>%
-    filter(names == input$Scientific_Vernacular_Name) %>%
-    mutate(eventDate = as.Date(modified)) %>%
-    group_by(names, yr = lubridate::year(eventDate)) %>%
-    summarise(Count = sum(individualCount, na.rm = TRUE)) %>%
-    ggplot(aes(x = yr, y = Count, fill = as.factor(yr))) +
-    geom_col() +
-    theme_minimal()
+  #Species Information
+  output$species_details <- renderUI({
+    data <- filtered_data()
+    if (nrow(data) > 0) {
+      species_info <- data[1, ] 
+      tagList(
+        tags$h4(tags$strong("Species Information")),
+        tags$p(tags$strong("Scientific Name:"), species_info$scientificName),
+        tags$p(tags$strong("Vernacular Name:"), species_info$vernacularName),
+        tags$p(tags$strong("Count:"), species_info$individualCount),
+        tags$p(tags$strong("Year:"), species_info$modified),
+        tags$p(tags$strong("Locality:"), species_info$locality)
+      )
+    } else {
+      tags$p("No information available for this species.")
+    }
+  })
+
+
+  output$species_map <- renderLeaflet({
+    leaflet(data = choropleth_data) %>%
+      addTiles() %>%
+      addCircleMarkers(
+        ~longitude, ~latitude,
+        radius = ~log(total_species + 1) * 2,
+        color = "brown",
+        popup = ~paste("<b>Locality:</b>", locality, "<br>",
+                       "<b>Total Species:</b>", total_species, "<br>",
+                       "<b>Kingdom:</b>", kingdom, "<br>",
+                       "<b>Year Range:</b>", min(year), " - ", max(year))
+      )
+  })
+  
+  # Reactive Data for Map Selection
+  selected_data <- reactive({
+    req(input$species_map_shape_click) # Trigger only when user interacts with map
+    clicked_point <- input$species_map_shape_click
+    longitude <- clicked_point$lng
+    latitude <- clicked_point$lat
     
-    
-})
+    # Filter the data based on the clicked location
+    choropleth_data %>%
+      filter(longitude == !!longitude & latitude == !!latitude)
+  })
+  
+  
 
 
 #Occurrence map by region (Poland)
-output$occurrence_map <- renderLeaflet({
-  selected_species <- input$species_selector
-  filtered_data <- bio_occurrence %>%
-    filter(names == selected_species)
-  
-  leaflet(data = filtered_data) %>%
-    addTiles() %>%
-    addCircleMarkers(
-      ~longitudeDecimal, ~latitudeDecimal,
-      radius = ~log(individualCount + 1) * 2,
-      color = "brown",
-      popup = ~paste("<b>Scientific Name:</b>", scientificName, "<br>",
-                     "<b>Vernacular Name:</b>", vernacularName, "<br>",
-                     "<b>Count:</b>", individualCount, "<br>",
-                     "<b>Year:</b>", modified, "<br>",
+  output$occurrence_map <- renderLeaflet({
+    selected_species <- input$species_selector
+    filtered_data <- bio_occurrence %>%
+      filter(names == selected_species)
+    
+    leaflet(data = filtered_data) %>%
+      addTiles() %>%
+      addCircleMarkers(
+        ~longitudeDecimal, ~latitudeDecimal,
+        radius = ~log(individualCount + 1) * 2,
+        color = "green",
+        popup = ~paste("<b>Scientific Name:</b>", scientificName, "<br>",
+                       "<b>Vernacular Name:</b>", vernacularName, "<br>",
+                       "<b>Count:</b>", individualCount, "<br>",
+                       "<b>Year:</b>", modified, "<br>",
                        "<b>Locality:</b>", locality)
-    )
-})
+      )
+  })
 
 # Map for all Species
 output$total_map <- renderLeaflet({
@@ -208,9 +271,10 @@ output$total_map <- renderLeaflet({
     addCircleMarkers(
       ~longitude, ~latitude,
       radius = ~log(total_species + 1) * 2,
-      color = "green",
+      color = "brown",
       popup = ~paste("<b>Locality:</b>", locality, "<br>",
                      "<b>Total Species:</b>", total_species)
+      
     )
 })
 
@@ -222,11 +286,12 @@ output$occurrence_by_year <- renderPlotly({
   yearly_data <- data %>%
     group_by(year = lubridate::year(eventDate)) %>%
     summarise(total_count = sum(individualCount, na.rm = TRUE)) %>%
-    filter(!is.na(year)) # Remover anos ausentes
+    filter(!is.na(year)) # remove missing years
   
-  # Create Graphic
-  p <- ggplot(yearly_data, aes(x = year, y = total_count)) +
-    geom_bar(stat = "identity", fill = "steelblue") +
+  # Create Graphic 
+  p <- ggplot(yearly_data, aes(x = year, y = total_count, fill = as.factor(year))) +
+    geom_bar(stat = "identity") +
+    scale_fill_manual(values = RColorBrewer::brewer.pal(length(unique(yearly_data$year)), "Set3")) +  
     labs(title = paste("Occurrence of", input$species_selector, "by Year"),
          x = "Year", y = "Total Occurrences") +
     theme_minimal()
@@ -305,7 +370,6 @@ output$occurrence_by_locality_total <- renderPlotly({
   p_plotly
 })
 
-# Graphic for Map of Total Species
 output$total_occurrence_by_year <- renderPlotly({
   yearly_data <- bio_occurrence %>%
     group_by(year = lubridate::year(eventDate)) %>%
@@ -313,8 +377,9 @@ output$total_occurrence_by_year <- renderPlotly({
     filter(!is.na(year))  # Remove missing years
   
   # Create Graphic
-  p <- ggplot(yearly_data, aes(x = year, y = total_count)) +
-    geom_bar(stat = "identity", fill = "steelblue") +
+  p <- ggplot(yearly_data, aes(x = year, y = total_count, fill = as.factor(year))) +
+    geom_bar(stat = "identity") +
+    scale_fill_manual(values = RColorBrewer::brewer.pal(length(unique(yearly_data$year)), "Set3")) +  
     labs(title = "Total Occurrence of Species by Year",
          x = "Year", y = "Total Occurrences") +
     theme_minimal()
