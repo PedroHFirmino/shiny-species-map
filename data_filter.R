@@ -4,7 +4,7 @@ install.packages("data.table")
 library(data.table)
 
 #Important - You must have change the directory
-input_file <- "F:/species-map/data/occurence.csv"
+input_file <- "data/occurence.csv"
 output_file <- "data/poland_data.csv"
 
 #Read

@@ -36,7 +36,7 @@ poland_border <- ne_states(country = "Poland", returnclass = "sf")
 
 
 #Read data and select
-bio_occurrence <- read_csv("data/poland_data.csv") #Important - You must have change the directory.
+bio_occurrence <- read_csv("data/poland_data.csv")
 
 bio_occurrence <- bio_occurrence %>%
   select(id, scientificName, vernacularName, individualCount, lifeStage, longitudeDecimal, latitudeDecimal,
